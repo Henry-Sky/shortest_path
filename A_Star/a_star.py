@@ -2,61 +2,80 @@ from Map.map import get_path
 import matplotlib.pyplot as plt
 import heapq
 
+
 class Node:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.preNode = None
-        self._g_ = 0
-        self._h_ = 0
+        self.preNode = None  # 记录前一个节点
+        self.distance = 0  # 已经过距离，初始为零
+        self.heuristic = 0  # 启发函数值
 
-    def _f_(self):
-        return self._g_ + self._h_
+    def prioritize(self):
+        # 经过距离和启发函数之和越小，优先级越高
+        return self.distance + self.heuristic
 
     def __lt__(self, other):
-        return self._f_() < other._f_()
+        # 重写堆的排序规则，按照优先级排序，值越小优先级越高
+        return self.prioritize() < other.prioritize()
 
-def a_star(map, start, goal):
+
+# 曼哈顿距离估计
+def manhattan_dist(current, target):
+    return abs(current.x - target.x) + abs(current.y - target.y)
+
+
+def a_star(map, start, goal, func=manhattan_dist):
+    assert (map[start[0]][start[1]] == 0 and map[goal[0]][goal[1]] == 0)
+    # 获取起点和终点，创建 openset 和 closeset
     start_x, start_y = start
     goal_x, goal_y = goal
     open_set = []
     close_set = set()
     # 初始化第一个节点
     origin = Node(start_x, start_y)
+    target = Node(goal_x, goal_y)
     heapq.heappush(open_set, origin)
     while len(open_set) > 0:
-        currNode = heapq.heappop(open_set)
-        if (currNode.x, currNode.y) == (goal_x, goal_y):
-            return True, currNode
+        # openset 中弹出一个优先级最高的节点进行检验
+        curr_node = heapq.heappop(open_set)
+        if (curr_node.x, curr_node.y) == (goal_x, goal_y):
+            result = []
+            # 对最终结果进行溯源，找出起点到终点的路径
+            while curr_node is not None:
+                result.append(curr_node)
+                curr_node = curr_node.preNode
+            result.reverse()
+            return True, result
         else:
-            close_set.add(currNode)
+            close_set.add(curr_node)  # 排除当前节点
+            # 搜寻下一个可能的节点，并加入 openset
             for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                new_x, new_y = currNode.x + dx, currNode.y + dy
-                if 0 <= new_x < len(map[0]) and 0 <= new_y < len(map) and map[new_x][new_y] == 0:
-                    newNode = Node(new_x, new_y)
-                    newNode._g_ = currNode._g_ + 1
-                    # 曼哈顿距离估计
-                    newNode._h_ = abs(new_x - goal_x) + abs(new_y - goal_y)
-                    newNode.preNode = currNode
-                    heapq.heappush(open_set, newNode)
+                new_x, new_y = curr_node.x + dx, curr_node.y + dy
+                if (0 <= new_x < len(map[0]) and 0 <= new_y < len(map)
+                        and map[new_x][new_y] != 1):
+                    new_node = Node(new_x, new_y)
+                    new_node.distance = curr_node.distance + 1
+                    new_node.heuristic = func(new_node, target)  # 调用启发函数，默认为曼哈顿距离
+                    new_node.preNode = curr_node
+                    heapq.heappush(open_set, new_node)
     return False, None
 
-if __name__ == '__main__':
+
+def main():
     map = get_path("")
-    plt.imshow(map)
-    plt.ion()
-    plt.axis('off')
-    start = (0,0)
-    goal = (len(map)-1, len(map[0])-1)
-    flag, node = a_star(map, start, goal)
+    flag, path = a_star(map, (0, 0), (18, 18))
     if flag:
-        while node.preNode is not None:
-            print(node.preNode.x, node.preNode.y)
-            node = node.preNode
-            map[node.x][node.y] = 0.5
+        # 开始绘图
+        plt.ion()
+        for node in path:
             plt.clf()
-            plt.cla()
-            plt.axis('off')
+            plt.axis("off")
+            map[node.x][node.y] = 0.5
             plt.imshow(map)
             plt.pause(0.5)
-    plt.ioff()
+        plt.ioff()
+
+
+if __name__ == '__main__':
+    main()
